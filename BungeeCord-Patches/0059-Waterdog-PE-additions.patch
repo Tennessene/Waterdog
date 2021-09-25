@@ -1,4 +1,4 @@
-From bb6a1d50a54babf098d306c05beedf2796259e73 Mon Sep 17 00:00:00 2001
+From a9a533b38c8a3e87c78913129443f8752a8e25e4 Mon Sep 17 00:00:00 2001
 From: Colin Godsey <crgodsey@gmail.com>
 Date: Tue, 16 Apr 2019 07:50:11 -0600
 Subject: [PATCH] Waterdog PE (additions)
@@ -792,10 +792,10 @@ index 00000000..e0c0b55f
 +}
 diff --git a/protocol/src/main/java/network/ycc/waterdog/pe/packet/PELogin.java b/protocol/src/main/java/network/ycc/waterdog/pe/packet/PELogin.java
 new file mode 100644
-index 00000000..ab5915b9
+index 00000000..d22a5f60
 --- /dev/null
 +++ b/protocol/src/main/java/network/ycc/waterdog/pe/packet/PELogin.java
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,225 @@
 +package network.ycc.waterdog.pe.packet;
 +
 +import com.nukkitx.nbt.NbtUtils;
@@ -935,6 +935,10 @@ index 00000000..ab5915b9
 +            buf.readIntLE(); // WorldWidth
 +            buf.readIntLE(); // WorldDepth
 +            buf.readBoolean(); // NetherType
++            if (protocolVersion >= ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                DefinedPacket.readString(buf); // EduSharedURIResource - button name
++                DefinedPacket.readString(buf); // EduSharedURIResource - link URI
++            }
 +            buf.readBoolean(); // ExpGameplay
 +        }
 +        DefinedPacket.readString(buf); // Level ID (empty string)
@@ -1462,10 +1466,10 @@ index 00000000..6a15b9c2
 +}
 diff --git a/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap_PE.java b/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap_PE.java
 new file mode 100644
-index 00000000..873b6353
+index 00000000..8417f5f9
 --- /dev/null
 +++ b/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap_PE.java
-@@ -0,0 +1,397 @@
+@@ -0,0 +1,427 @@
 +package net.md_5.bungee.entitymap;
 +
 +import io.netty.buffer.ByteBuf;
@@ -1590,8 +1594,9 @@ index 00000000..873b6353
 +                        act.accept(SK_VI_DATA); // xuid
 +                        act.accept(SK_VI_DATA); // channel
 +                        if (version >= ProtocolConstants.MINECRAFT_PE_1_13) {
-+                            to.writeBytes(from, Integer.BYTES); //build platform
-+                            // serialized skin data
++                            to.writeBytes(from, Integer.BYTES); // build platform
++
++                            // SerializedSkin - START
 +                            act.accept(SK_VI_DATA); // skin id
 +                            if (version >= ProtocolConstants.MINECRAFT_PE_1_16_210) {
 +                                act.accept(SK_VI_DATA); // playFab id
@@ -1616,10 +1621,15 @@ index 00000000..873b6353
 +                            to.writeBytes(from, Integer.BYTES); // cape height
 +                            act.accept(SK_VI_DATA); // cape data
 +                            act.accept(SK_VI_DATA); // skin geom data
++                            if (version >= ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                act.accept(SK_VI_DATA); // geom data engine version
++                            }
 +                            act.accept(SK_VI_DATA); // serialized animation data
-+                            to.writeBytes(from, Byte.BYTES); // is premium skin
-+                            to.writeBytes(from, Byte.BYTES); // is persona skin
-+                            to.writeBytes(from, Byte.BYTES); // is persona cape on classic skin
++                            if (version < ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                to.writeBytes(from, Byte.BYTES); // is premium skin
++                                to.writeBytes(from, Byte.BYTES); // is persona skin
++                                to.writeBytes(from, Byte.BYTES); // is persona cape on classic skin
++                            }
 +                            act.accept(SK_VI_DATA); // cape id
 +                            act.accept(SK_VI_DATA); // full skin id
 +
@@ -1651,6 +1661,15 @@ index 00000000..873b6353
 +                                    }
 +                                }
 +                            }
++
++                            if (version >= ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                to.writeBytes(from, Byte.BYTES); // is premium skin
++                                to.writeBytes(from, Byte.BYTES); // is persona skin
++                                to.writeBytes(from, Byte.BYTES); // is persona cape on classic skin
++                                to.writeBytes(from, Byte.BYTES); // is primary user
++                            }
++                            // SerializedSkin - END
++
 +                            to.writeBytes(from, Byte.BYTES); // is teacher
 +                            to.writeBytes(from, Byte.BYTES); // is host
 +                        }
@@ -1754,7 +1773,8 @@ index 00000000..873b6353
 +                        packet.skipBytes(DefinedPacket.readVarInt(packet)); // channel
 +                        if (version >= ProtocolConstants.MINECRAFT_PE_1_13) {
 +                            packet.skipBytes(Integer.BYTES); // build platform
-+                            // serialized skin data
++
++                            // SerializedSkin - START
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // skin id
 +                            if (version >= ProtocolConstants.MINECRAFT_PE_1_16_210) {
 +                                packet.skipBytes(DefinedPacket.readVarInt(packet)); // playFab id
@@ -1780,10 +1800,15 @@ index 00000000..873b6353
 +                            packet.skipBytes(Integer.BYTES); // cape height
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // cape data
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // skin geom data
++                            if (version >= ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                packet.skipBytes(DefinedPacket.readVarInt(packet)); // geom data engine version
++                            }
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // serialized animation data
-+                            packet.skipBytes(Byte.BYTES); // is premium skin
-+                            packet.skipBytes(Byte.BYTES); // is persona skin
-+                            packet.skipBytes(Byte.BYTES); // is persona cape on classic skin
++                            if (version < ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                packet.skipBytes(Byte.BYTES); // is premium skin
++                                packet.skipBytes(Byte.BYTES); // is persona skin
++                                packet.skipBytes(Byte.BYTES); // is persona cape on classic skin
++                            }
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // cape id
 +                            packet.skipBytes(DefinedPacket.readVarInt(packet)); // full skin id
 +
@@ -1807,6 +1832,15 @@ index 00000000..873b6353
 +                                    }
 +                                }
 +                            }
++
++                            if (version >= ProtocolConstants.MINECRAFT_PE_1_17_30) {
++                                packet.skipBytes(Byte.BYTES); // is premium skin
++                                packet.skipBytes(Byte.BYTES); // is persona skin
++                                packet.skipBytes(Byte.BYTES); // is persona cape on classic skin
++                                packet.skipBytes(Byte.BYTES); // is primary user
++                            }
++                            // SerializedSkin - END
++
 +                            packet.skipBytes(Byte.BYTES); // is teacher
 +                            packet.skipBytes(Byte.BYTES); // is host
 +                        }
